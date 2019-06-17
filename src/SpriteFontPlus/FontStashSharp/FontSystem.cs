@@ -175,6 +175,14 @@ namespace FontStashSharp
 			{
 				var codepoint = char.ConvertToUtf32(str.String, i + str.Location);
 				glyph = GetGlyph(font, codepoint, isize, iblur, true);
+
+
+                if (glyph == null)
+                {
+
+                    continue;
+                }
+
 				if (glyph != null)
 				{
 					GetQuad(font, prevGlyphIndex, glyph, scale, Spacing, ref originX, ref originY, &q);
@@ -235,6 +243,7 @@ namespace FontStashSharp
 			{
 				var codepoint = char.ConvertToUtf32(str.String, i + str.Location);
 				glyph = GetGlyph(font, codepoint, isize, iblur, false);
+
 				if (glyph != null)
 				{
 					GetQuad(font, prevGlyphIndex, glyph, scale, Spacing, ref x, ref y, &q);
@@ -428,7 +437,7 @@ namespace FontStashSharp
 			BlurCols(dst, w, h, dstStride, alpha);
 		}
 
-		private FontGlyph GetGlyph(Font font, int codepoint, int isize, int iblur, bool isBitmapRequired)
+		private FontGlyph GetGlyph(Font font, int codepoint, int isize, int iblur, bool isBitmapRequired, bool searchRecursively = true)
 		{
 			var i = 0;
 			var g = 0;
@@ -460,12 +469,31 @@ namespace FontStashSharp
 			{
 				if (!isBitmapRequired || glyph.X0 >= 0 && glyph.Y0 >= 0)
 					return glyph;
-
 			}
+
 			g = font._font.fons__tt_getGlyphIndex(codepoint);
+
+			// Look for the glyph in other loaded fonts
 			if (g == 0)
 			{
-				throw new Exception(string.Format("Could not find glyph for codepoint {0}", codepoint));
+                if (searchRecursively)
+                {
+                    foreach (var f in _fonts)
+                    {
+                        if (f == font)
+                            continue;
+
+                        var newGlyph = GetGlyph(f, codepoint, isize, iblur, true, false);
+                        g = f._font.fons__tt_getGlyphIndex(codepoint);
+
+                        if (g == 0)
+                            continue;
+
+                        return newGlyph;
+                    }
+
+                    // No glyph was found at this point
+                }
 			}
 
 			scale = renderFont._font.fons__tt_getPixelHeightScale(size);
